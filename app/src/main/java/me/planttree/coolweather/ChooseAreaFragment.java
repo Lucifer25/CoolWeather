@@ -11,6 +11,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -41,6 +42,7 @@ public class ChooseAreaFragment extends Fragment {
     public static final int LEVEL_COUNTRY = 2;
 
     private ProgressDialog progressDialog;
+    private RelativeLayout areaTitleLayout;
     private TextView titleText;
     private Button backButton;
     private ListView listView;
@@ -81,11 +83,15 @@ public class ChooseAreaFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState){
         View view = inflater.inflate(R.layout.choose_area, container, false);
+        areaTitleLayout = (RelativeLayout) view.findViewById(R.id.area_title_layout);
         titleText = (TextView) view.findViewById(R.id.title_text);
         backButton = (Button) view.findViewById(R.id.back_button);
         listView = (ListView) view.findViewById(R.id.list_view);
         adapter = new ArrayAdapter<String>(getContext(), android.R.layout.simple_list_item_1, dataList);
         listView.setAdapter(adapter);
+        if(getActivity() instanceof WeatherActivity){
+            areaTitleLayout.setPadding(0, 50, 0, 0);
+        }
         return view;
     }
 

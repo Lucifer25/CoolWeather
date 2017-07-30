@@ -25,6 +25,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.util.Calendar;
 
 import me.planttree.coolweather.gson.Forecast;
 import me.planttree.coolweather.gson.Weather;
@@ -35,6 +36,14 @@ import okhttp3.Callback;
 import okhttp3.Response;
 
 public class WeatherActivity extends AppCompatActivity {
+
+    /**
+     * get system's time
+     */
+    Calendar c = Calendar.getInstance();
+    final String date = String.valueOf(c.get(Calendar.YEAR))
+            + String.valueOf(c.get(Calendar.MONTH))
+            + String.valueOf(c.get(Calendar.DATE));
 
     private ImageView bingPicImage;
     public DrawerLayout drawerLayout;
@@ -89,10 +98,12 @@ public class WeatherActivity extends AppCompatActivity {
             }
         });
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+
         /**
          * load bing image
          */
-        String bingPic = prefs.getString("bing_pic", null);
+
+        String bingPic = prefs.getString(date + "bing_pic", null);
         if(bingPic != null){
             Glide.with(this).load(bingPic).into(bingPicImage);
         }else{
@@ -133,10 +144,13 @@ public class WeatherActivity extends AppCompatActivity {
                     JSONObject jsonObject = new JSONObject(responseText);
                     JSONArray jsonArray = jsonObject.getJSONArray("images");
                     final String imageUrl = "http://cn.bing.com" + jsonArray.getJSONObject(0).getString("url");
+                    SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(WeatherActivity.this);
                     SharedPreferences.Editor editor = PreferenceManager
                             .getDefaultSharedPreferences(WeatherActivity.this)
                             .edit();
-                    editor.putString("bing_pic", imageUrl);
+                    // delete cache
+                    editor.clear();
+                    editor.putString(date + "bing_pic", imageUrl);
                     editor.apply();
                     runOnUiThread(new Runnable() {
                         @Override
