@@ -108,7 +108,7 @@ public class ChooseAreaFragment extends Fragment {
                     selectedCity = cityList.get(position);
                     queryCountries();
                 }else if(currentLevel == LEVEL_COUNTRY){
-                    String weatherId = countryList.get(position).getCountryName();
+                    String weatherId = "city=" + countryList.get(position).getCountryName();
                     if(getActivity() instanceof MainActivity){
                         Intent intent = new Intent(getActivity(), WeatherActivity.class);
                         intent.putExtra("weather_id", weatherId);

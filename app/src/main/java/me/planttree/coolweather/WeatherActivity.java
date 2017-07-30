@@ -1,5 +1,6 @@
 package me.planttree.coolweather;
 
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
@@ -37,13 +38,8 @@ import okhttp3.Response;
 
 public class WeatherActivity extends AppCompatActivity {
 
-    /**
-     * get system's time
-     */
-    Calendar c = Calendar.getInstance();
-    final String date = String.valueOf(c.get(Calendar.YEAR))
-            + String.valueOf(c.get(Calendar.MONTH))
-            + String.valueOf(c.get(Calendar.DATE));
+    private String date;
+    private String weatherID = null;
 
     private ImageView bingPicImage;
     public DrawerLayout drawerLayout;
@@ -72,6 +68,14 @@ public class WeatherActivity extends AppCompatActivity {
             window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
         }
         setContentView(R.layout.activity_weather);
+
+        /**
+         * get system's time
+         */
+        Calendar c = Calendar.getInstance();
+        date = String.valueOf(c.get(Calendar.YEAR))
+                + String.valueOf(c.get(Calendar.MONTH))
+                + String.valueOf(c.get(Calendar.DATE));
 
         // initialize widget
         bingPicImage = (ImageView) findViewById(R.id.bing_pic_img);
@@ -113,15 +117,24 @@ public class WeatherActivity extends AppCompatActivity {
         /**
          * load weather info
          */
-        final String weatherId;
-        weatherId = getIntent().getStringExtra("weather_id");
-        weatherLayout.setVisibility(View.INVISIBLE);
-        requestWeather(weatherId);
+        String weatherString = prefs.getString("weather", null);
 
+        if(weatherString != null){
+            Weather weather = Utility.handleWeatherResponse(weatherString);
+            weatherID = "cityid=" + weather.basic.weatherId;
+            showWeatherInfo(weather);
+        }else{
+            weatherID = "city=" + getIntent().getStringExtra("weather_id");
+            weatherLayout.setVisibility(View.INVISIBLE);
+            requestWeather(weatherID);
+        }
+
+//        weatherLayout.setVisibility(View.INVISIBLE);
+//        requestWeather(weatherId);
         swipeRefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
             @Override
             public void onRefresh() {
-                requestWeather(weatherId);
+                requestWeather(weatherID);
             }
         });
     }
@@ -129,14 +142,13 @@ public class WeatherActivity extends AppCompatActivity {
     /**
      * load bing image
      */
-    private void loadBingPic(){
+    public void loadBingPic(){
         String url = "http://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1";
         HttpUtil.sendOkHttpRequest(url, new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
                 e.printStackTrace();
             }
-
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 String responseText = response.body().string();
@@ -144,7 +156,6 @@ public class WeatherActivity extends AppCompatActivity {
                     JSONObject jsonObject = new JSONObject(responseText);
                     JSONArray jsonArray = jsonObject.getJSONArray("images");
                     final String imageUrl = "http://cn.bing.com" + jsonArray.getJSONObject(0).getString("url");
-                    SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(WeatherActivity.this);
                     SharedPreferences.Editor editor = PreferenceManager
                             .getDefaultSharedPreferences(WeatherActivity.this)
                             .edit();
@@ -168,7 +179,7 @@ public class WeatherActivity extends AppCompatActivity {
      * request weather info based on weather_id
      */
     public void requestWeather(final String weatherId){
-        String weatherUrl = "https://free-api.heweather.com/x3/weather?city="
+        String weatherUrl = "https://free-api.heweather.com/x3/weather?"
                 + weatherId
                 + "&key=f4e65dc04469402c9faf0152aca25e93";
         HttpUtil.sendOkHttpRequest(weatherUrl, new Callback() {
@@ -192,11 +203,17 @@ public class WeatherActivity extends AppCompatActivity {
                     @Override
                     public void run() {
                         if(weather != null && "ok".equals(weather.status)){
+                            weatherID = weatherId;
                             SharedPreferences.Editor editor =
                                     PreferenceManager.getDefaultSharedPreferences(WeatherActivity.this).edit();
+                            editor.remove("weather");
                             editor.putString("weather", responseText);
                             editor.apply();
                             showWeatherInfo(weather);
+                            Intent intent = new Intent(WeatherActivity.this, AutoUpdateService.class);
+                            intent.putExtra("weather_id", weatherId);
+                            intent.putExtra("date", date);
+                            startService(intent);
                             Toast.makeText(WeatherActivity.this, "刷新成功", Toast.LENGTH_SHORT).show();
                         }else{
                             Toast.makeText(WeatherActivity.this, "获取天气信息失败", Toast.LENGTH_SHORT).show();
