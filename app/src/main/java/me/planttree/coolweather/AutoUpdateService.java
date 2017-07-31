@@ -35,14 +35,14 @@ public class AutoUpdateService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId){
         String weatherId = intent.getStringExtra("weather_id");
-        final String date = intent.getStringExtra("date");
-        updateWeather(weatherId);
+        String date = intent.getStringExtra("date");
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         if(prefs.getString(date + "bing_pic", null) == null){
             updateBingPic(date);
         }
+        updateWeather(weatherId);
         AlarmManager manager = (AlarmManager) getSystemService(ALARM_SERVICE);
-        int anHour = 10 * 1000;
+        int anHour = 30 * 60 * 1000;
         long triggerAtTime = SystemClock.elapsedRealtime() + anHour;
         Intent i = new Intent(this, AutoUpdateService.class);
         PendingIntent pi = PendingIntent.getService(this, 0, i, 0);
@@ -63,7 +63,6 @@ public class AutoUpdateService extends Service {
             public void onFailure(Call call, IOException e) {
                 e.printStackTrace();
             }
-
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 final String responseText = response.body().string();
@@ -71,6 +70,7 @@ public class AutoUpdateService extends Service {
                 if(weather != null && "ok".equals(weather.status)){
                     SharedPreferences.Editor editor = PreferenceManager
                             .getDefaultSharedPreferences(AutoUpdateService.this).edit();
+                    editor.remove("weather");
                     editor.putString("weather", responseText);
                     editor.apply();
                 }
@@ -98,9 +98,15 @@ public class AutoUpdateService extends Service {
                     JSONObject jsonObject = new JSONObject(responseText);
                     JSONArray jsonArray = jsonObject.getJSONArray("images");
                     final String imageUrl = "http://cn.bing.com" + jsonArray.getJSONObject(0).getString("url");
+                    SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(AutoUpdateService.this);
                     SharedPreferences.Editor editor = PreferenceManager
                             .getDefaultSharedPreferences(AutoUpdateService.this)
                             .edit();
+                    // delete cache
+                    int lastDate = Integer.valueOf(date) - 1;
+                    if(prefs.getString(lastDate + "bing_pic", null) != null){
+                        editor.remove(lastDate + "bing_pic");
+                    }
                     editor.putString(date + "bing_pic", imageUrl);
                     editor.apply();
                 }catch (Exception e){

@@ -1,5 +1,6 @@
 package me.planttree.coolweather;
 
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
@@ -20,6 +21,10 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.baidu.location.BDLocation;
+import com.baidu.location.BDLocationListener;
+import com.baidu.location.LocationClient;
+import com.baidu.location.LocationClientOption;
 import com.bumptech.glide.Glide;
 
 import org.json.JSONArray;
@@ -38,6 +43,11 @@ import okhttp3.Response;
 
 public class WeatherActivity extends AppCompatActivity {
 
+    public ProgressDialog progressDialog;
+    public LocationClient mLocationClient;
+    private String countryId;
+
+
     private String date;
     private String weatherID = null;
 
@@ -48,6 +58,7 @@ public class WeatherActivity extends AppCompatActivity {
     private Button navButton;
     private TextView titleCity;
     private TextView titleUpdateTime;
+    private Button location;
     private TextView degreeText;
     private TextView weatherInfoText;
     private LinearLayout forecastLayout;
@@ -67,6 +78,11 @@ public class WeatherActivity extends AppCompatActivity {
             Window window = getWindow();
             window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
         }
+        /**
+         * BaiduMAp initialize
+         */
+        mLocationClient = new LocationClient(getApplicationContext());
+        mLocationClient.registerLocationListener(new MyLocationListener());
         setContentView(R.layout.activity_weather);
 
         /**
@@ -86,6 +102,7 @@ public class WeatherActivity extends AppCompatActivity {
         navButton = (Button) findViewById(R.id.nav_button);
         titleCity = (TextView) findViewById(R.id.title_city);
         titleUpdateTime = (TextView) findViewById(R.id.title_update_time);
+        location = (Button) findViewById(R.id.location);
         degreeText = (TextView) findViewById(R.id.degree_text);
         weatherInfoText = (TextView) findViewById(R.id.weather_info_text);
         forecastLayout = (LinearLayout) findViewById(R.id.forecast_layout);
@@ -101,32 +118,44 @@ public class WeatherActivity extends AppCompatActivity {
                 drawerLayout.openDrawer(GravityCompat.START);
             }
         });
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        location.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View v){
+                requestLocation();
+            }
+        });
+
 
         /**
          * load bing image
          */
 
-        String bingPic = prefs.getString(date + "bing_pic", null);
+        /*String bingPic = prefs.getString(date + "bing_pic", null);
         if(bingPic != null){
             Glide.with(this).load(bingPic).into(bingPicImage);
-        }else{
+        }else{*/
             loadBingPic();
-        }
+//        }
 
         /**
          * load weather info
          */
-        String weatherString = prefs.getString("weather", null);
-
-        if(weatherString != null){
-            Weather weather = Utility.handleWeatherResponse(weatherString);
-            weatherID = "cityid=" + weather.basic.weatherId;
-            showWeatherInfo(weather);
-        }else{
-            weatherID = "city=" + getIntent().getStringExtra("weather_id");
+        if("MainActivity".equals(getIntent().getStringExtra("activity"))){
+            weatherID = getIntent().getStringExtra("weather_id");
             weatherLayout.setVisibility(View.INVISIBLE);
             requestWeather(weatherID);
+        }else{
+            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+            String weatherString = prefs.getString("weather", null);
+            if(weatherString != null){
+                Weather weather = Utility.handleWeatherResponse(weatherString);
+                weatherID = "cityid=" + weather.basic.weatherId;
+                showWeatherInfo(weather);
+            }else{
+                weatherID = "city=" + getIntent().getStringExtra("weather_id");
+                weatherLayout.setVisibility(View.INVISIBLE);
+                requestWeather(weatherID);
+            }
         }
 
 //        weatherLayout.setVisibility(View.INVISIBLE);
@@ -138,42 +167,68 @@ public class WeatherActivity extends AppCompatActivity {
             }
         });
     }
+    @Override
+    protected void onStart(){
+        super.onStart();
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String weatherString = prefs.getString("weather", null);
+        if(weatherString != null){
+            Weather weather = Utility.handleWeatherResponse(weatherString);
+            weatherID = "cityid=" + weather.basic.weatherId;
+            showWeatherInfo(weather);
+        }else{
+            weatherID = "city=" + getIntent().getStringExtra("weather_id");
+            weatherLayout.setVisibility(View.INVISIBLE);
+            requestWeather(weatherID);
+        }
+    }
+
 
     /**
      * load bing image
      */
     public void loadBingPic(){
-        String url = "http://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1";
-        HttpUtil.sendOkHttpRequest(url, new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                e.printStackTrace();
-            }
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                String responseText = response.body().string();
-                try{
-                    JSONObject jsonObject = new JSONObject(responseText);
-                    JSONArray jsonArray = jsonObject.getJSONArray("images");
-                    final String imageUrl = "http://cn.bing.com" + jsonArray.getJSONObject(0).getString("url");
-                    SharedPreferences.Editor editor = PreferenceManager
-                            .getDefaultSharedPreferences(WeatherActivity.this)
-                            .edit();
-                    // delete cache
-                    editor.clear();
-                    editor.putString(date + "bing_pic", imageUrl);
-                    editor.apply();
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            Glide.with(WeatherActivity.this).load(imageUrl).into(bingPicImage);
-                        }
-                    });
-                }catch (Exception e){
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String bingPic = prefs.getString(date + "bing_pic", null);
+        if(bingPic != null){
+            Glide.with(this).load(bingPic).into(bingPicImage);
+        }else{
+            String url = "http://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1";
+            HttpUtil.sendOkHttpRequest(url, new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
                     e.printStackTrace();
                 }
-            }
-        });
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
+                    String responseText = response.body().string();
+                    try{
+                        JSONObject jsonObject = new JSONObject(responseText);
+                        JSONArray jsonArray = jsonObject.getJSONArray("images");
+                        final String imageUrl = "http://cn.bing.com" + jsonArray.getJSONObject(0).getString("url");
+                        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(WeatherActivity.this);
+                        SharedPreferences.Editor editor = PreferenceManager
+                                .getDefaultSharedPreferences(WeatherActivity.this)
+                                .edit();
+                        // delete cache
+                        int lastDate = Integer.valueOf(date) - 1;
+                        if(prefs.getString(lastDate + "bing_pic", null) != null){
+                            editor.remove(lastDate + "bing_pic");
+                        }
+                        editor.putString(date + "bing_pic", imageUrl);
+                        editor.apply();
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Glide.with(WeatherActivity.this).load(imageUrl).into(bingPicImage);
+                            }
+                        });
+                    }catch (Exception e){
+                        e.printStackTrace();
+                    }
+                }
+            });
+        }
     }
     /**
      * request weather info based on weather_id
@@ -211,10 +266,10 @@ public class WeatherActivity extends AppCompatActivity {
                             editor.apply();
                             showWeatherInfo(weather);
                             Intent intent = new Intent(WeatherActivity.this, AutoUpdateService.class);
-                            intent.putExtra("weather_id", weatherId);
+                            intent.putExtra("weather_id", weatherID);
                             intent.putExtra("date", date);
                             startService(intent);
-                            Toast.makeText(WeatherActivity.this, "刷新成功", Toast.LENGTH_SHORT).show();
+//                            Toast.makeText(WeatherActivity.this, "刷新成功", Toast.LENGTH_SHORT).show();
                         }else{
                             Toast.makeText(WeatherActivity.this, "获取天气信息失败", Toast.LENGTH_SHORT).show();
                         }
@@ -261,5 +316,36 @@ public class WeatherActivity extends AppCompatActivity {
         carWashText.setText(carWash);
         sportText.setText(sport);
         weatherLayout.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * location
+     */
+    public void requestLocation(){
+        progressDialog = new ProgressDialog(this);
+        progressDialog.setMessage("重新定位中...");
+        progressDialog.show();
+        LocationClientOption option = new LocationClientOption();
+        option.setIsNeedAddress(true);
+        mLocationClient.setLocOption(option);
+        mLocationClient.start();
+    }
+
+    public class MyLocationListener implements BDLocationListener {
+        @Override
+        public void onReceiveLocation(BDLocation location){
+            progressDialog.dismiss();
+            if(location != null){
+                countryId = "city=" + location.getDistrict();
+                Toast.makeText(WeatherActivity.this, "定位成功！", Toast.LENGTH_SHORT).show();
+                requestWeather(countryId);
+            }else{
+                Toast.makeText(WeatherActivity.this, "定位失败！", Toast.LENGTH_SHORT).show();
+            }
+        }
+        public void onConnectHotSpotMessage(String connect, int hotSpotState){
+
+        }
+
     }
 }

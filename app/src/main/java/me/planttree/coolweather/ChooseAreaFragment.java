@@ -42,12 +42,15 @@ public class ChooseAreaFragment extends Fragment {
     public static final int LEVEL_COUNTRY = 2;
 
     private ProgressDialog progressDialog;
+    private Button location;
     private RelativeLayout areaTitleLayout;
     private TextView titleText;
     private Button backButton;
     private ListView listView;
     private ArrayAdapter<String> adapter;
     private List<String> dataList = new ArrayList<>();
+
+
 
     /**
      * list of province
@@ -84,12 +87,14 @@ public class ChooseAreaFragment extends Fragment {
                              Bundle savedInstanceState){
         View view = inflater.inflate(R.layout.choose_area, container, false);
         areaTitleLayout = (RelativeLayout) view.findViewById(R.id.area_title_layout);
+        location = (Button) view.findViewById(R.id.location);
         titleText = (TextView) view.findViewById(R.id.title_text);
         backButton = (Button) view.findViewById(R.id.back_button);
         listView = (ListView) view.findViewById(R.id.list_view);
         adapter = new ArrayAdapter<String>(getContext(), android.R.layout.simple_list_item_1, dataList);
         listView.setAdapter(adapter);
         if(getActivity() instanceof WeatherActivity){
+            location.setVisibility(View.GONE);
             areaTitleLayout.setPadding(0, 50, 0, 0);
         }
         return view;
@@ -129,6 +134,15 @@ public class ChooseAreaFragment extends Fragment {
                     queryCities();
                 }else if(currentLevel == LEVEL_CITY){
                     queryProvinces();
+                }
+            }
+        });
+        location.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View v){
+                if(getActivity() instanceof MainActivity){
+                    MainActivity activity = (MainActivity) getActivity();
+                    activity.requestLocation();
                 }
             }
         });
